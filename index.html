@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>湾区记忆拼图</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;600&family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- 其他库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://unpkg.com/splitting@1.0.6/dist/splitting.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/splitting@1.0.6/dist/splitting.css">
+    <style>
+        body {
+            background: #1a1a1a;
+            overflow-x: hidden;
+        }
+        
+        #particles-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.3;
+        }
+        
+        .memory-card {
+            background: #2d2d2d;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .memory-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        
+        .memory-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 12px;
+            padding: 3px;
+            background: var(--card-gradient);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: exclude;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+        }
+        
+        .timeline {
+            position: relative;
+            background: linear-gradient(90deg, transparent 0%, rgba(253, 203, 110, 0.3) 50%, transparent 100%);
+            height: 2px;
+            margin: 60px 0;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: -1px;
+            height: 4px;
+            width: 100%;
+            background: linear-gradient(90deg, transparent 0%, #fdcb6e 50%, transparent 100%);
+            box-shadow: 0 0 20px rgba(253, 203, 110, 0.5);
+        }
+        
+        .floating-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(253, 203, 110, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .floating-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 35px rgba(253, 203, 110, 0.5);
+        }
+        
+        .floating-btn::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: inherit;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.4);
+                opacity: 0;
+            }
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #2d2d2d;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .projection-effect {
+            position: relative;
+            background: radial-gradient(circle at center, rgba(253, 203, 110, 0.2) 0%, transparent 70%);
+            border-radius: 50%;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .memory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 32px;
+            padding: 40px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .memory-grid {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+        }
+        
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(253, 203, 110, 0.2);
+        }
+        
+        .main-content {
+            margin-top: 80px;
+            min-height: 100vh;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(253, 203, 110, 0.3);
+            border-top: 3px solid #fdcb6e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #fdcb6e;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #e17055;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans">
+    <!-- 背景粒子画布 -->
+    <canvas id="particles-canvas"></canvas>
+    
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-serif font-bold text-yellow-400">Bay Area Memory Puzzle</h1>
+                    <span class="text-gray-400">·</span>
+                    <span class="text-lg font-serif">湾区记忆拼图</span>
+                </div>
+                <div class="flex space-x-6">
+                    <button id="gallery-btn" class="text-gray-300 hover:text-yellow-400 transition-colors">展厅</button>
+                    <button id="star-map-btn" class="text-gray-300 hover:text-yellow-400 transition-colors">星图</button>
+                    <button id="map-btn" class="text-gray-300 hover:text-yellow-400 transition-colors">寄语</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- 主内容区域 -->
+    <main class="main-content">
+        <!-- 展厅视图 -->
+        <section id="gallery-view" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-serif font-bold mb-4 text-yellow-400">记忆长廊</h2>
+                <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                    每一张老照片都是一个故事，每一个故事都值得被珍藏。在这里，我们用数字化手段抢救和延续大湾区口述史，共建可触摸的集体记忆。
+                </p>
+            </div>
+            
+            <div class="timeline"></div>
+            
+            <div id="memory-container" class="memory-grid">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+            
+            <div id="empty-state" class="text-center py-20 hidden">
+                <div class="text-6xl mb-6">📸</div>
+                <h3 class="text-2xl font-serif mb-4 text-gray-300">还没有记忆</h3>
+                <p class="text-gray-400 mb-8">点击下方按钮，开始记录你的第一个湾区珍贵记忆</p>
+                <button class="add-memory-btn bg-gradient-to-r from-yellow-400 to-orange-500 px-8 py-3 rounded-full text-gray-900 font-medium hover:shadow-lg transition-all">
+                    留下第一个记忆
+                </button>
+            </div>
+        </section>
+        
+        <!-- 星图视图 -->
+        <section id="star-map-view" class="hidden min-h-screen relative">
+            <div class="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-900 to-black">
+                <img src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&auto=format&fit=crop&q=80" alt="星空背景" class="w-full h-full object-cover opacity-50">
+            </div>
+            <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div class="text-center mb-12">
+                    <h2 class="text-4xl font-serif font-bold mb-4 text-yellow-400">港区记忆星图</h2>
+                    <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                        每一颗星星都是一个湾区记忆的闪光点，它们在时光的长河中永恒闪耀，照亮大湾区的发展历程。
+                    </p>
+                </div>
+                <div id="star-constellation" class="relative min-h-96"></div>
+            </div>
+        </section>
+        
+        <!-- 地图视图 -->
+        <section id="map-view" class="hidden min-h-screen">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div class="text-center mb-12">
+                    <h2 class="text-4xl font-serif font-bold mb-4 text-yellow-400">湾区记忆寄语</h2>
+                    <p class="text-xl text-gray-400 max-w-2xl mx-auto mt-4 text-left">
+                        &nbsp;&nbsp;粤港澳大湾区，这片充满活力与创新精神的土地，承载着无数人的梦想与回忆。从繁华的都市到宁静的乡村，从高楼林立的商业区到风景如画的自然景区，每一个地方都记录着独特的故事，每一段记忆都闪耀着它的光芒。
+                    </p>
+                    <p class="text-xl text-gray-400 max-w-2xl mx-auto mt-4 text-left">
+                        &nbsp;&nbsp;在这片土地上，无论是土生土长的居民，还是来自五湖四海的追梦人，都在用自己的方式书写着历史。湾区的每一个角落，都充满了生机与活力，它们见证了无数的欢笑与泪水，成功与挫折，相聚与离别。这些记忆，如同珍珠般串联起来，构成了我们共同的集体记忆版图。
+                    </p>
+                    <p class="text-xl text-gray-400 max-w-2xl mx-auto mt-4 text-left">
+                        &nbsp;&nbsp;每一段记忆都是宝贵的，它们不仅属于个人，也属于整个大湾区。这些记忆，无论是喜悦还是悲伤，成功还是失败，都是我们共同的财富。它们让我们更加珍惜现在，激励我们勇敢地面对未来。
+                    </p>
+                    <p class="text-xl text-gray-400 max-w-2xl mx-auto mt-4 text-left">
+                        &nbsp;&nbsp;让我们珍视每一段记忆，让它们在粤港澳大湾区的每一个角落继续发光发热，共同绘制出一幅丰富多彩的集体记忆版图。这不仅记录了我们的过去，也将指引我们走向更加辉煌的未来。
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <!-- 浮动添加按钮 -->
+    <div class="floating-btn" id="add-memory-btn">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-900">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+    </div>
+    
+    <!-- 记忆详情模态框 -->
+    <div id="memory-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-serif font-bold text-yellow-400">记忆详情</h3>
+                <button id="close-detail-modal" class="text-gray-400 hover:text-gray-200">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="text-center">
+                <div class="mb-6">
+                    <img id="detail-memory-photo" src="" alt="记忆照片" class="w-64 h-64 object-cover rounded-lg mx-auto">
+                </div>
+                
+                <div class="text-left">
+                    <p class="text-gray-400 mb-2">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1" class="inline mr-2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <span id="detail-memory-location"></span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加记忆模态框 -->
+    <div id="add-memory-modal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-serif font-bold text-yellow-400">留下记忆</h3>
+                <button id="close-modal" class="text-gray-400 hover:text-gray-200">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="projection-effect mb-8">
+                <div id="photo-upload-area" class="w-48 h-48 border-2 border-dashed border-yellow-400 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-800 transition-colors">
+                    <div class="text-center">
+                        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" class="mx-auto mb-2 text-yellow-400">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21,15 16,10 5,21"/>
+                        </svg>
+                        <p class="text-sm text-gray-400">点击上传照片</p>
+                    </div>
+                    <input type="file" id="photo-input" accept="image/*" class="hidden">
+                </div>
+                <img id="photo-preview" class="hidden w-48 h-48 object-cover rounded-lg">
+                
+                <div id="audio-upload-area" class="mt-4 w-full border-2 border-dashed border-yellow-400 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-800 transition-colors py-4">
+                    <div class="text-center">
+                        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" class="mx-auto mb-2 text-yellow-400">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                        <p class="text-sm text-gray-400">点击上传音频</p>
+                    </div>
+                    <input type="file" id="audio-input" accept="audio/*" class="hidden">
+                </div>
+                <div id="audio-preview" class="hidden mt-4 w-full">
+                    <audio id="audio-player" controls class="w-full"></audio>
+                </div>
+            </div>
+            
+            <form id="memory-form" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">记忆标题</label>
+                    <input type="text" id="memory-title" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-gray-200 focus:outline-none focus:border-yellow-400 transition-colors" placeholder="给你的记忆起个名字...">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">记忆描述</label>
+                    <textarea id="memory-description" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-gray-200 focus:outline-none focus:border-yellow-400 transition-colors resize-none" placeholder="记录下这个美好时刻的故事..."></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">地点</label>
+                    <input type="text" id="memory-location" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-gray-200 focus:outline-none focus:border-yellow-400 transition-colors" placeholder="这个记忆发生在哪里？">
+                </div>
+                
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="button" id="cancel-btn" class="px-6 py-2 text-gray-400 hover:text-gray-200 transition-colors">
+                        取消
+                    </button>
+                    <button type="submit" id="save-memory-btn" class="px-8 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full text-gray-900 font-medium hover:shadow-lg transition-all">
+                        保存记忆
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 分享按钮 -->
+    <div class="fixed bottom-30 right-30 flex flex-col space-y-4 z-1000">
+        <button id="export-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+            导出数据
+        </button>
+        <label class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 cursor-pointer transition-colors">
+            导入数据
+            <input type="file" id="import-input" accept=".json" class="hidden">
+        </label>
+    </div>
+    
+    <script>
+        // ========== 全局变量 ==========
+        let memories = [];
+        let currentView = 'gallery';
+        
+        // 暖色渐变库
+        const warmGradients = [
+            'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+            'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+            'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+            'linear-gradient(135deg, #ff8a80 0%, #ffab40 100%)',
+            'linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%)',
+            'linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%)',
+            'linear-gradient(135deg, #6c5ce7 0%, #fd79a8 100%)',
+            'linear-gradient(135deg, #00b894 0%, #00cec9 100%)'
+        ];
+        
+        function generateMemoryId() {
+            return 'N' + Math.random().toString(36).substr(2, 7).toUpperCase();
+        }
+        
+        function getRandomGradient() {
+            return warmGradients[Math.floor(Math.random() * warmGradients.length)];
+        }
+        
+        // ========== 文件处理 ==========
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+        
+        // ========== 本地存储操作 ==========
+        function saveMemoryToLocalStorage(memory) {
+            const memories = JSON.parse(localStorage.getItem('memories') || '[]');
+            memories.unshift(memory);
+            localStorage.setItem('memories', JSON.stringify(memories));
+            return memories;
+        }
+        
+        function loadMemoriesFromLocalStorage() {
+            return JSON.parse(localStorage.getItem('memories') || '[]');
+        }
+        
+        // ========== 分享功能 ==========
+        function generateShareLink() {
+            const memories = JSON.parse(localStorage.getItem('memories') || '[]');
+            const dataStr = JSON.stringify(memories);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'memories.json';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+        }
+        
+        function importFromFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedMemories = JSON.parse(e.target.result);
+                    localStorage.setItem('memories', JSON.stringify(importedMemories));
+                    memories = importedMemories;
+                    renderMemories();
+                    showNotification('导入成功！', 'success');
+                } catch (error) {
+                    showNotification('导入失败，请检查文件格式', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        // ========== DOM操作 ==========
+        function createMemoryCard(memory) {
+            const card = document.createElement('div');
+            card.className = 'memory-card';
+            card.style.setProperty('--card-gradient', memory.color);
+            
+            card.innerHTML = `
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-sm text-gray-400 font-mono">${memory.memoryId}</span>
+                        <span class="text-sm text-gray-400">${formatDate(memory.timestamp)}</span>
+                    </div>
+                    
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0">
+                            <img src="${memory.photoUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjMkQyRDJEIi8+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjIwIiBzdHJva2U9IiNGRkY1RjUiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4K'}" alt="${memory.title}" class="w-24 h-24 object-cover rounded-lg">
+                        </div>
+                        
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-serif font-semibold text-gray-200 mb-2 truncate">${memory.title}</h3>
+                            <p class="text-gray-400 text-sm mb-3 line-clamp-2">${memory.description}</p>
+                            <div class="flex items-center text-xs text-gray-400">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1" class="mr-1">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                                    <circle cx="12" cy="10" r="3"/>
+                                </svg>
+                                ${memory.location || '未知地点'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end mt-4">
+                        <button class="text-xs text-yellow-400 hover:text-orange-500 transition-colors">
+                            在地图上发光 ✨
+                        </button>
+                    </div>
+                    ${memory.audioUrl ? `
+                    <div class="mt-4">
+                        <audio controls class="w-full" preload="none">
+                            <source src="${memory.audioUrl}" type="audio/mpeg">
+                            您的浏览器不支持音频播放。
+                         </audio>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        function renderMemories() {
+            const container = document.getElementById('memory-container');
+            
+            if (memories.length === 0) {
+                showEmptyState();
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            memories.forEach((memory, index) => {
+                const card = createMemoryCard(memory);
+                container.appendChild(card);
+                
+                anime({
+                    targets: card,
+                    opacity: [0, 1],
+                    translateY: [50, 0],
+                    delay: index * 100,
+                    duration: 600,
+                    easing: 'easeOutQuart'
+                });
+            });
+        }
+        
+        function showEmptyState() {
+            document.getElementById('memory-container').innerHTML = '';
+            document.getElementById('empty-state').classList.remove('hidden');
+        }
+        
+        function hideEmptyState() {
+            document.getElementById('empty-state').classList.add('hidden');
+        }
+        
+        function switchView(viewName) {
+            document.querySelectorAll('section[id$="-view"]').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            document.getElementById(`${viewName}-view`).classList.remove('hidden');
+            currentView = viewName;
+            
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.remove('text-yellow-400');
+                btn.classList.add('text-gray-300');
+            });
+            
+            document.getElementById(`${viewName === 'gallery' ? 'gallery' : viewName === 'star-map' ? 'star-map' : 'map'}-btn`).classList.add('text-yellow-400');
+            document.getElementById(`${viewName === 'gallery' ? 'gallery' : viewName === 'star-map' ? 'star-map' : 'map'}-btn`).classList.remove('text-gray-300');
+            
+            if (viewName === 'star-map') {
+                initStarMap();
+            }
+        }
+        
+        function initStarMap() {
+            const container = document.getElementById('star-constellation');
+            container.innerHTML = '';
+            
+            memories.forEach((memory, index) => {
+                const star = document.createElement('div');
+                star.className = 'absolute w-4 h-4 cursor-pointer';
+                star.style.left = `${20 + Math.random() * 60}%`;
+                star.style.top = `${20 + Math.random() * 60}%`;
+                star.style.background = memory.color;
+                star.style.borderRadius = '50%';
+                star.style.boxShadow = '0 0 20px rgba(253, 203, 110, 0.8)';
+                
+                star.innerHTML = `
+                    <div class="relative">
+                        <div class="w-4 h-4 rounded-full animate-pulse"></div>
+                        <div class="absolute inset-0 w-4 h-4 rounded-full" style="background: ${memory.color};"></div>
+                    </div>
+                `;
+                
+                star.addEventListener('click', () => {
+                    showMemoryDetail(memory);
+                });
+                
+                container.appendChild(star);
+                
+                anime({
+                    targets: star,
+                    opacity: [0.3, 1, 0.3],
+                    scale: [1, 1.2, 1],
+                    delay: index * 200,
+                    duration: 2000,
+                    loop: true,
+                    easing: 'easeInOutSine'
+                });
+            });
+        }
+        
+        function showMemoryDetail(memory) {
+            document.getElementById('detail-memory-photo').src = memory.photoUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjMkQyRDJEIi8+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjIwIiBzdHJva2U9IiNGRkY1RjUiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4K';
+            document.getElementById('detail-memory-location').textContent = memory.location || '未知地点';
+            document.getElementById('memory-detail-modal').classList.add('active');
+        }
+        
+        async function saveMemory() {
+            try {
+                const submitBtn = document.getElementById('save-memory-btn');
+                submitBtn.disabled = true;
+                submitBtn.textContent = '保存中...';
+                
+                let photoUrl = null;
+                const photoInput = document.getElementById('photo-input');
+                if (photoInput.files.length > 0) {
+                    photoUrl = await fileToBase64(photoInput.files[0]);
+                }
+                
+                let audioUrl = null;
+                const audioInput = document.getElementById('audio-input');
+                if (audioInput.files.length > 0) {
+                    audioUrl = await fileToBase64(audioInput.files[0]);
+                }
+                
+                const memory = {
+                    memoryId: generateMemoryId(),
+                    title: document.getElementById('memory-title').value,
+                    description: document.getElementById('memory-description').value,
+                    location: document.getElementById('memory-location').value,
+                    photoUrl: photoUrl,
+                    audioUrl: audioUrl,
+                    timestamp: Date.now(),
+                    color: getRandomGradient()
+                };
+                
+                memories = saveMemoryToLocalStorage(memory);
+                renderMemories();
+                hideEmptyState();
+                
+                document.getElementById('add-memory-modal').classList.remove('active');
+                showNotification('✨ 记忆已保存！', 'success');
+                
+                resetForm();
+                
+            } catch (error) {
+                console.error('保存失败:', error);
+                showNotification('保存失败，请重试', 'error');
+            } finally {
+                const submitBtn = document.getElementById('save-memory-btn');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '保存记忆';
+                }
+            }
+        }
+        
+        function resetForm() {
+            document.getElementById('memory-form').reset();
+            document.getElementById('photo-preview').classList.add('hidden');
+            document.getElementById('photo-upload-area').classList.remove('hidden');
+            document.getElementById('audio-preview').classList.add('hidden');
+            document.getElementById('audio-upload-area').classList.remove('hidden');
+            const audioPlayer = document.getElementById('audio-player');
+            audioPlayer.src = '';
+        }
+        
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-20 right-4 px-6 py-3 rounded-lg text-white z-50 ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            anime({
+                targets: notification,
+                translateX: [300, 0],
+                opacity: [0, 1],
+                duration: 300,
+                easing: 'easeOutQuart'
+            });
+            
+            setTimeout(() => {
+                anime({
+                    targets: notification,
+                    translateX: [0, 300],
+                    opacity: [1, 0],
+                    duration: 300,
+                    easing: 'easeInQuart',
+                    complete: () => {
+                        document.body.removeChild(notification);
+                    }
+                });
+            }, 3000);
+        }
+        
+        function loadSampleMemories() {
+            memories = [
+                {
+                    memoryId: 'N001-F2E9',
+                    title: '日落时分的海边漫步',
+                    description: '那天傍晚，我们在海边散步，金色的阳光洒在海面上，波光粼粼。',
+                    photoUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
+                    location: '青岛金沙滩',
+                    timestamp: Date.now() - 86400000 * 7,
+                    color: getRandomGradient()
+                },
+                {
+                    memoryId: 'N002-A7C3',
+                    title: '古城墙上的黄昏',
+                    description: '站在古老的城墙上，看着夕阳西下，感受着历史的厚重。',
+                    photoUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400',
+                    location: '西安古城墙',
+                    timestamp: Date.now() - 86400000 * 14,
+                    color: getRandomGradient()
+                }
+            ];
+            localStorage.setItem('memories', JSON.stringify(memories));
+            renderMemories();
+        }
+        
+        function initParticles() {
+            const canvas = document.getElementById('particles-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            const particles = [];
+            const particleCount = 50;
+            
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5,
+                    size: Math.random() * 2 + 1,
+                    opacity: Math.random() * 0.5 + 0.2
+                });
+            }
+            
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                particles.forEach(particle => {
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    
+                    if (particle.x < 0 || particle.x > canvas.width) particle.vx *= -1;
+                    if (particle.y < 0 || particle.y > canvas.height) particle.vy *= -1;
+                    
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(253, 203, 110, ${particle.opacity})`;
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        // ========== 启动应用 ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. 先初始化粒子效果
+            initParticles();
+            
+            // 2. 加载记忆
+            memories = loadMemoriesFromLocalStorage();
+            if (memories.length === 0) {
+                loadSampleMemories();
+            } else {
+                renderMemories();
+            }
+            
+            // 3. 绑定所有事件
+            document.getElementById('gallery-btn').addEventListener('click', () => switchView('gallery'));
+            document.getElementById('star-map-btn').addEventListener('click', () => switchView('star-map'));
+            document.getElementById('map-btn').addEventListener('click', () => switchView('map'));
+            
+            document.getElementById('add-memory-btn').addEventListener('click', () => {
+                document.getElementById('add-memory-modal').classList.add('active');
+            });
+            
+            document.getElementById('close-modal').addEventListener('click', () => {
+                document.getElementById('add-memory-modal').classList.remove('active');
+            });
+            
+            document.getElementById('cancel-btn').addEventListener('click', () => {
+                document.getElementById('add-memory-modal').classList.remove('active');
+            });
+            
+            document.getElementById('close-detail-modal').addEventListener('click', () => {
+                document.getElementById('memory-detail-modal').classList.remove('active');
+            });
+            
+            document.getElementById('add-memory-modal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    document.getElementById('add-memory-modal').classList.remove('active');
+                }
+            });
+            
+            document.getElementById('memory-detail-modal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    document.getElementById('memory-detail-modal').classList.remove('active');
+                }
+            });
+            
+            document.getElementById('photo-upload-area').addEventListener('click', () => {
+                document.getElementById('photo-input').click();
+            });
+            
+            document.getElementById('photo-input').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const preview = document.getElementById('photo-preview');
+                        const uploadArea = document.getElementById('photo-upload-area');
+                        
+                        preview.src = e.target.result;
+                        preview.classList.remove('hidden');
+                        uploadArea.classList.add('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            document.getElementById('audio-upload-area').addEventListener('click', () => {
+                document.getElementById('audio-input').click();
+            });
+            
+            document.getElementById('audio-input').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const audioPlayer = document.getElementById('audio-player');
+                    const audioPreview = document.getElementById('audio-preview');
+                    const audioUploadArea = document.getElementById('audio-upload-area');
+                    
+                    audioPlayer.src = URL.createObjectURL(file);
+                    audioPreview.classList.remove('hidden');
+                    audioUploadArea.classList.add('hidden');
+                }
+            });
+            
+            document.getElementById('memory-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await saveMemory();
+            });
+            
+            document.querySelector('.add-memory-btn').addEventListener('click', () => {
+                document.getElementById('add-memory-modal').classList.add('active');
+            });
+            
+            // 分享功能事件
+            document.getElementById('export-btn').addEventListener('click', generateShareLink);
+            
+            document.getElementById('import-input').addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    importFromFile(e.target.files[0]);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
